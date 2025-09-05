@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>縁日花火ホッケー</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display.swap" rel="stylesheet">
+
+    <style>
+        body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: 'Arial', sans-serif; }
+        
+        #video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: black;
+            z-index: 2000;
+            transition: opacity 0.5s ease-out;
+            display: none;
+        }
+        #intro-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #skip-button {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            font-family: 'Dela Gothic One', sans-serif;
+            font-size: 20px;
+            color: white;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid white;
+            padding: 10px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 2001;
+        }
+
+        .game-ui-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 50px;
+            color: #fff;
+            font-family: 'Dela Gothic One', sans-serif;
+            font-size: 120px;
+            font-weight: 400;
+            text-shadow: 4px 4px 8px rgba(0,0,0,0.9);
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
+        .timer-display {
+             min-width: 350px;
+             text-align: center;
+        }
+
+        .message-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-family: 'Dela Gothic One', sans-serif;
+            font-size: 90px;
+            font-weight: 400;
+            text-shadow: 5px 5px 10px rgba(0,0,0,1);
+            z-index: 1001;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+        }
+        .message-display.visible {
+            opacity: 1;
+        }
+        .message-display.popup {
+            animation: pop-and-fade 1.5s forwards;
+        }
+
+        @keyframes pop-and-fade {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+            30% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+        
+        #win-lose-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            align-items: center;
+            z-index: 1002;
+        }
+        .win-lose-message {
+            width: 50%;
+            text-align: center;
+            font-family: 'Dela Gothic One', sans-serif;
+            font-size: 150px;
+            font-weight: 400;
+            color: white;
+            text-shadow: 5px 5px 10px rgba(0,0,0,1);
+            opacity: 0;
+        }
+        .win-lose-message.visible {
+             animation: fade-in-dramatic 1.5s forwards;
+        }
+
+        @keyframes fade-in-dramatic {
+            0% { opacity: 0; transform: scale(0.5); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        #start-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Dela Gothic One', sans-serif;
+            font-size: 50px;
+            color: white;
+            background: linear-gradient(145deg, #f96, #f36);
+            border: none;
+            padding: 20px 50px;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            z-index: 1003;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: none;
+        }
+        #start-button:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 15px 25px rgba(0,0,0,0.5);
+        }
+        #start-button:active {
+            transform: translate(-50%, -50%) scale(0.95);
+        }
+
+    </style>
+</head>
+<body>
+    <div id="video-container">
+        <video id="intro-video" muted playsinline>
+            <source src="intro.mp4" type="video/mp4">
+            動画を再生できません。
+        </video>
+        <button id="skip-button">スキップ</button>
+    </div>
+
+    <div class="game-ui-container">
+        <div id="score-left">〇</div>
+        <div id="game-timer" class="timer-display">2:00</div>
+        <div id="score-right">〇</div>
+    </div>
+    <div id="game-message" class="message-display"></div>
+    <button id="start-button">ゲームスタート</button>
+
+    <div id="win-lose-container">
+        <div id="message-left" class="win-lose-message"></div>
+        <div id="message-right" class="win-lose-message"></div>
+    </div>
+    
+    <script>
+        // --- Game variables ---
+        let stars = [];
+        let isAudioInitialized = false;
+        let observerLat;
+        const observerLng = 139.41;      
+        
+        let bgm, launchSound;
+        let aka_frames = [], ao_frames = [], ki_frames = [];
+        let activeAnimations = [];
+        const NUM_AKA_FRAMES = 148;
+        const NUM_AO_FRAMES = 155;
+        const NUM_KI_FRAMES = 155;
+        const FRAME_DURATION_MS = 40; 
+
+        let gameState = 'intro';
+        let gameStartTime = 0;
+        const GAME_DURATION_MS = 120 * 1000;
+        let ballAddedAt60 = false;
+        let speedUpAt30 = false;
+        let speedUpAt60 = false;
+        let speedUpAt90 = false;
+        
+        let scoreLeft = 0;
+        let scoreRight = 0;
+        let leftShiftDown = false;
+        let rightShiftDown = false;
+        
+        let starfield;
+        let startButton;
+        let uiContainer;
+        let video, videoContainer, skipButton;
+
+
+        function preload() {
+            soundFormats('m4a', 'mp3');
+            bgm = loadSound('bgm.m4a');
+            launchSound = loadSound('launch.m4a');
+            
+            for (let i = 1; i <= NUM_AKA_FRAMES; i++) {
+                let filename = `aka/aka_${i.toString().padStart(3, '0')}.png`;
+                aka_frames.push(loadImage(filename));
+            }
+            for (let i = 1; i <= NUM_AO_FRAMES; i++) {
+                let filename = `ao/ao_${i.toString().padStart(3, '0')}.png`;
+                ao_frames.push(loadImage(filename));
+            }
+            for (let i = 1; i <= NUM_KI_FRAMES; i++) {
+                let filename = `ki/ki_${i.toString().padStart(3, '0')}.png`;
+                ki_frames.push(loadImage(filename));
+            }
+
+            loadStrings('hip6_mag.csv', (lines) => {
+                const data = Papa.parse(lines.join('\n'), {header: true}).data;
+                for (let row of data) {
+                    const ra = parseFloat(row.ra_degrees); const dec = parseFloat(row.dec_degrees); const mag = parseFloat(row.magnitude);
+                    if (!isNaN(ra) && !isNaN(dec) && !isNaN(mag)) {
+                        stars.push({ ra, dec, mag });
+                    }
+                }
+            }, (error) => console.error("Failed to load hip6_mag.csv."));
+        }               
+
+        // --- Astronomical and utility functions (unchanged) ---
+        function degreesToRadians(degrees) { return degrees * Math.PI / 180; }
+        function julianDate(date) { const Y = date.getUTCFullYear(); const M = date.getUTCMonth() + 1; const D = date.getUTCDate() + (date.getUTCHours() + date.getUTCMinutes()/60 + date.getUTCSeconds()/3600)/24; let A = Math.floor(Y / 100); let B = 2 - A + Math.floor(A / 4); return Math.floor(365.25 * (Y + 4716)) + Math.floor(30.6001 * (M + 1)) + D + B - 1524.5; }
+        function calculateSiderealTimeFromDate(date, longitude) { const JD = julianDate(date); const D = JD - 2451545.0; let gst = 280.46061837 + 360.98564736629 * D; let lst = gst + longitude; lst = ((lst % 360) + 360) % 360; return lst; }
+        function equatorialToHorizontal(raDeg, decDeg, lstDeg, latRad) { let haDeg = lstDeg - raDeg; haDeg = ((haDeg + 360) % 360); if (haDeg > 180) haDeg -= 360; const ha = radians(haDeg); const dec = radians(decDeg); const sinAlt = sin(dec) * sin(latRad) + cos(dec) * cos(latRad) * cos(ha); const alt = asin(sinAlt); const cosAz = (sin(dec) - sin(alt) * sin(latRad)) / (cos(alt) * cos(latRad)); let az = acos(constrain(cosAz, -1, 1)); if (sin(ha) > 0) az = TWO_PI - az; return { az, alt }; }
+        
+        // --- sound functions ---
+        function initAudio() { if (!isAudioInitialized) { userStartAudio(); isAudioInitialized = true; } }
+        function playLaunchSound() { if (launchSound) { launchSound.play(); } }
+
+        function selectFramesForColor(color) {
+            const r = color[0]; const g = color[1]; const b = color[2];
+            if (r > g && r > b) return aka_frames;
+            if (b > r && b > g) return ao_frames;
+            if (r > b && g > b) return ki_frames;
+            return random([aka_frames, ao_frames, ki_frames]);
+        }
+        
+        function launchFireworksForSection(section) {
+            const colors = [[255, 100, 100], [100, 100, 255], [255, 255, 100]];
+            let sectionWidth = width / 4;
+            let startX = section * sectionWidth + random(sectionWidth);
+            let color = random(colors);
+            let frames = selectFramesForColor(color);
+            
+            if (frames && frames.length > 0) {
+                activeAnimations.push({ frames, x: startX, y: height, startTime: millis(), totalDuration: frames.length * FRAME_DURATION_MS, size: 375 * random(0.8, 1.2) });
+                setTimeout(playLaunchSound, 700);
+            }
+        }
+
+        function celebrationFireworks(count = 1) {
+            const colors = [[255, 215, 0], [255, 255, 255], [255, 100, 100], [100, 255, 255]];
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    let startX = random(width * 0.2, width * 0.8);
+                    let color = random(colors);
+                    let frames = selectFramesForColor(color);
+                    
+                    if (frames && frames.length > 0) {
+                        activeAnimations.push({ frames, x: startX, y: height, startTime: millis(), totalDuration: frames.length * FRAME_DURATION_MS, size: 375 * random(0.8, 1.2) });
+                        setTimeout(playLaunchSound, 700);
+                    }
+                }, i * 150); 
+            }
+        }
+        
+        function toKanji(num) {
+            if (typeof num !== 'number' || num < 0) return ''; const kanjiDigits = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九']; if (num < 10) return kanjiDigits[num];
+            if (num < 100) { const ten = Math.floor(num / 10); const one = num % 10; let tenStr = ten > 1 ? kanjiDigits[ten] + '十' : '十'; return tenStr + (one > 0 ? kanjiDigits[one] : ''); }
+            return num.toString(); 
+        }
+
+        function handleComplexKeys(event) {
+            if (gameState !== 'playing' && gameState !== 'overtime') return;
+            
+            if (event.key === 'Shift') {
+                if (event.location === KeyboardEvent.DOM_KEY_LOCATION_LEFT) leftShiftDown = (event.type === 'keydown');
+                else if (event.location === KeyboardEvent.DOM_KEY_LOCATION_RIGHT) rightShiftDown = (event.type === 'keydown');
+            }
+            if (event.type === 'keydown' && event.code.startsWith('Digit')) {
+                const pointsToAdd = parseInt(event.code.replace('Digit', ''), 10);
+                if (!isNaN(pointsToAdd) && pointsToAdd > 0 && pointsToAdd <= 9) {
+                    if (leftShiftDown) { scoreLeft += pointsToAdd; celebrationFireworks(pointsToAdd); }
+                    if (rightShiftDown) { scoreRight += pointsToAdd; celebrationFireworks(pointsToAdd); }
+                    checkWinConditions();
+                }
+            }
+        }
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight); 
+            imageMode(CENTER);
+            angleMode(RADIANS); 
+            observerLat = radians(35.69);              
+            
+            starfield = createGraphics(width, height);
+            drawStarfield(starfield);
+
+            startButton = select('#start-button');
+            startButton.mousePressed(startGame);
+            
+            uiContainer = select('.game-ui-container');
+            
+            videoContainer = document.getElementById('video-container');
+            video = document.getElementById('intro-video');
+            skipButton = document.getElementById('skip-button');
+            
+            const transitionToStartMenu = () => {
+                if (gameState !== 'intro') return;
+                initAudio();
+                videoContainer.style.opacity = '0';
+                setTimeout(() => {
+                    videoContainer.style.display = 'none';
+                    resetGame();
+                }, 500);
+            };
+            
+            skipButton.onclick = transitionToStartMenu;
+            video.onended = transitionToStartMenu;
+            
+            gameState = 'intro';
+            videoContainer.style.display = 'block';
+            videoContainer.style.opacity = '1';
+            video.currentTime = 0;
+            video.pause();
+
+            window.addEventListener('keydown', handleComplexKeys);
+            window.addEventListener('keyup', handleComplexKeys); 
+        }
+
+        function starSize(mag) { return constrain(map(mag, -1, 6, 8, 1), 1, 8); }
+
+        function drawStarfield(pg) {
+            pg.background(10);
+            for (let i = 0; i <= pg.height; i++) { let c = lerpColor(color(25, 25, 80), color(10, 10, 30), map(i, 0, pg.height, 0, 1)); pg.stroke(c); pg.line(0, i, pg.width, i); }
+            pg.push();
+            pg.translate(pg.width / 2, pg.height / 2); 
+            const date = new Date(Date.UTC(2025, 7, 5, 12, 0, 0)); 
+            const lst = calculateSiderealTimeFromDate(date, observerLng);
+            for (let star of stars) {
+                const hor = equatorialToHorizontal(star.ra, star.dec, lst, observerLat);
+                if (hor.alt > 0 && hor.alt <= radians(45) && hor.az >= radians(135) && hor.az <= radians(225)) {
+                    const x = map(degrees(hor.az), 135, 225, -pg.width / 2, pg.width / 2); 
+                    const y = map(degrees(hor.alt), 0, 45, pg.height / 2, -pg.height / 2);
+                    const size = starSize(star.mag);
+                    pg.noStroke(); pg.fill(255, map(star.mag, -1, 6, 255, 50)); pg.ellipse(x, y, size, size);
+                }
+            }
+            pg.pop();
+        }
+
+        function draw() {
+            image(starfield, width/2, height/2);
+            
+            for (let i = activeAnimations.length - 1; i >= 0; i--) {
+                let anim = activeAnimations[i];
+                let elapsed = millis() - anim.startTime;
+                if (elapsed >= anim.totalDuration) {
+                    activeAnimations.splice(i, 1);
+                    continue;
+                }
+                let frameIndex = floor(elapsed / FRAME_DURATION_MS);
+                frameIndex = constrain(frameIndex, 0, anim.frames.length - 1);
+                let currentFrame = anim.frames[frameIndex];
+                if (currentFrame) {
+                    let w = anim.size; 
+                    let h = currentFrame.height * (w / currentFrame.width);
+                    image(currentFrame, anim.x, anim.y - h/2, w, h);
+                }
+            }
+            updateGameUI();
+        }
+        
+        function updateGameUI() {
+            const timerEl = document.getElementById('game-timer');
+            const scoreLeftEl = document.getElementById('score-left');
+            const scoreRightEl = document.getElementById('score-right');
+            
+            if (gameState === 'playing') {
+                let elapsed = millis() - gameStartTime;
+                let timeLeft = GAME_DURATION_MS - elapsed;
+                
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    endGameByTime();
+                } else {
+                    if (!speedUpAt30 && elapsed >= 30000) { bgm.rate(1.25); speedUpAt30 = true; }
+                    if (!speedUpAt60 && elapsed >= 60000) { bgm.rate(1.5); speedUpAt60 = true; }
+                    if (!speedUpAt90 && elapsed >= 90000) { bgm.rate(1.75); speedUpAt90 = true; }
+                    if (!ballAddedAt60 && elapsed >= 60000) { ballAddedAt60 = true; showMessage('玉追加', true); }
+                }
+                timerEl.textContent = formatTime(timeLeft);
+            }
+            
+            scoreLeftEl.textContent = toKanji(scoreLeft);
+            scoreRightEl.textContent = toKanji(scoreRight);
+        }
+
+        function formatTime(ms) {
+            let s = floor(ms / 1000);
+            let m = floor(s / 60);
+            s = s % 60;
+            return m + ':' + s.toString().padStart(2, '0');
+        }
+
+        function showMessage(text, isPopup = false) {
+            const msgEl = document.getElementById('game-message');
+            msgEl.textContent = text;
+            msgEl.classList.add('visible');
+            if (isPopup) {
+                msgEl.classList.add('popup');
+                setTimeout(() => {
+                    msgEl.classList.remove('popup');
+                    // MODIFIED: This condition is now removed to ensure message always hides.
+                    msgEl.classList.remove('visible');
+                }, 1500);
+            }
+        }
+
+        function hideMessage() {
+            const msgEl = document.getElementById('game-message');
+            msgEl.classList.remove('visible');
+        }
+
+        function checkWinConditions() {
+            if (gameState === 'playing') {
+                if (scoreLeft >= 4) { endGame('left'); } 
+                else if (scoreRight >= 4) { endGame('right'); }
+            } else if (gameState === 'overtime') {
+                if (scoreLeft > scoreRight) { endGame('left'); }
+                else if (scoreRight > scoreLeft) { endGame('right'); }
+            }
+        }
+        
+        function endGameByTime() {
+            if (gameState !== 'playing') return;
+            if (bgm) bgm.rate(2.0);
+
+            if (scoreLeft > scoreRight) { endGame('left'); }
+            else if (scoreRight > scoreLeft) { endGame('right'); }
+            else { 
+                gameState = 'overtime'; 
+                showMessage('延長戦！');
+                setTimeout(() => showMessage('玉追加', true), 1500);
+            }
+        }
+
+        function endGame(winnerSide) {
+            if (gameState === 'ended') return;
+            gameState = 'ended';
+
+            if (bgm && bgm.isPlaying()) {
+                bgm.stop();
+            }
+
+            const winLoseContainer = document.getElementById('win-lose-container');
+            const msgLeft = document.getElementById('message-left');
+            const msgRight = document.getElementById('message-right');
+
+            hideMessage();
+
+            if (winnerSide === 'left') {
+                msgLeft.textContent = '勝ち！';
+                msgRight.textContent = '負け…';
+            } else {
+                msgLeft.textContent = '負け…';
+                msgRight.textContent = '勝ち！';
+            }
+
+            winLoseContainer.style.display = 'flex';
+            msgLeft.classList.add('visible');
+            msgRight.classList.add('visible');
+            
+            setTimeout(resetGame, 5000);
+        }
+
+        function resetGame() {
+            if (bgm && bgm.isPlaying()) {
+                bgm.stop();
+            }
+
+            const winLoseContainer = document.getElementById('win-lose-container');
+            const msgLeft = document.getElementById('message-left');
+            const msgRight = document.getElementById('message-right');
+
+            winLoseContainer.style.display = 'none';
+            msgLeft.textContent = '';
+            msgRight.textContent = '';
+            msgLeft.classList.remove('visible');
+            msgRight.classList.remove('visible');
+
+            scoreLeft = 0;
+            scoreRight = 0;
+            ballAddedAt60 = false;
+            document.getElementById('game-timer').textContent = "2:00";
+            
+            hideMessage();
+            
+            if (gameState === 'ended') {
+                gameState = 'intro';
+                videoContainer.style.display = 'block';
+                videoContainer.style.opacity = '1';
+                video.currentTime = 0;
+                video.pause();
+                startButton.hide();
+                uiContainer.style('display', 'none');
+            } else {
+                 gameState = 'waiting';
+                 startButton.show();
+                 uiContainer.style('display', 'none');
+            }
+        }
+        
+        function startGame() {
+            if (gameState === 'waiting' || gameState === 'ended') {
+                initAudio();
+                if (bgm && !bgm.isPlaying()) {
+                    bgm.setVolume(0.3);
+                    bgm.loop();
+                }
+
+                gameState = 'playing';
+                gameStartTime = millis();
+                scoreLeft = 0;
+                scoreRight = 0;
+                ballAddedAt60 = false;
+                if(bgm) bgm.rate(1.0);
+                speedUpAt30 = false;
+                speedUpAt60 = false;
+                speedUpAt90 = false;
+
+                activeAnimations = [];
+                hideMessage();
+                startButton.hide();
+                uiContainer.style('display', 'flex');
+            }
+        }
+
+        function keyPressed() {
+            if (key === ' ' && gameState === 'intro') {
+                initAudio();
+                if (video.paused) {
+                    video.play();
+                } else {
+                    video.pause();
+                }
+            }
+
+            if (key.toLowerCase() === 'r') { resetGame(); }
+
+            if (gameState === 'playing' || gameState === 'overtime') {
+                let section = -1;
+                switch (key.toLowerCase()) { 
+                    case 'a': section = 0; break; 
+                    case 's': section = 1; break; 
+                    case 'd': section = 2; break; 
+                    case 'f': section = 3; break; 
+                }
+                if(section !== -1) launchFireworksForSection(section);
+            }
+        }
+        
+        function windowResized() { 
+            resizeCanvas(windowWidth, windowHeight); 
+            starfield = createGraphics(width, height);
+            drawStarfield(starfield);
+        }
+    </script>
+</body>
+</html>
+
+
